@@ -1,58 +1,32 @@
 # =========================================================================
-# OLLAMA MODELFILE - MAXIMALE SYSTEMKONFIGURATION & PARAMETER-TUNING
+# OLLAMA MODELFILE - KORRIGIERTE SYSTEMKONFIGURATION
 # =========================================================================
 
-# 1. DAS BASISMODELL (Verpflichtend)
-# Definiert, welches Modell als Grundlage dient
-FROM qwen2.5:14b
+FROM cyberwald/sauerkrautlm-nemo-12b-instruct:latest
 
-
-# 2. STRUKTUR, DIALECT & SYSTEM-ROLLE
-# SYSTEM: Setzt die permanente Identität/Anweisung für die KI
+# Der Standard-System-Prompt (Wird von n8n überschrieben, dient als Fallback)
 SYSTEM """
-Du bist ein hochpräzises, sachliches KI-Modell. 
-Deine Aufgabe ist es, Fakten exakt zu extrahieren. 
-Du halluzinierst nicht. Wenn du etwas nicht weißt, sagst du es.
+Du bist ein professioneller, deutschsprachiger KI-Assistent. Beantworte alle Fragen präzise, sachlich richtig und im höflichen Du-Stil. Nutze eine klare Strukturierung bei komplexen Themen.
 """
 
-# TEMPLATE: Definiert das exakte Prompt-Format (Go-Template-Syntax)
-TEMPLATE """{{ if .System }}<|im_start|>system
-{{ .System }}<|im_end|>
-{{ end }}{{ if .Prompt }}<|im_start|>user
-{{ .Prompt }}<|im_end|>
-{{ end }}<|im_start|>assistant
-{{ .Response }}<|im_end|>"""
+# --- Mathematische Sampler (Präzision & Logik) ---
+PARAMETER temperature 0.3
+PARAMETER top_p 0.95
+PARAMETER top_k 30
+PARAMETER min_p 0.05
+PARAMETER num_predict -1
 
+# --- Sanfter Wiederholungsschutz (Sweet Spot für Deutsch) ---
+PARAMETER presence_penalty 0.0
+PARAMETER repeat_penalty 1.05
+PARAMETER repeat_last_n 64
 
-# 3. ANTI-HALLUZINATIONS-PARAMETER (Gruppe 1)
-PARAMETER temperature 0.2        # Reduziert Kreativität, erhöht Faktentreue (0.0 - 2.0)
-PARAMETER top_p 0.9              # Nucleus-Sampling: Ignoriert unwahrscheinliche Wort-Ausläufer
-PARAMETER top_k 30               # Begrenzt den Wortschatz pro Schritt auf die Top-X Wörter
-PARAMETER min_p 0.05             # Filtert Wörter aus, deren Wahrscheinlichkeit unter 5% liegt
-PARAMETER num_predict 512        # Entspricht 'Max Tokens to Generate' (Länge der Antwort)
+# --- Hardware- & Ressourcen-Zuweisung ---
+PARAMETER num_ctx 8192
+PARAMETER num_gpu -1
+PARAMETER num_thread 8
+# SEED WURDE ENTFERNT, DAMIT DIE KI IM CHAT DYNAMISCH ANTWORTET
 
-
-# 4. STRAFMAẞE & TEXTFLUSS-STEUERUNG (Gruppe 2)
-PARAMETER presence_penalty 0.4   # Bestraft Wiederholung von Themen/Konzepten
-PARAMETER repeat_penalty 1.15    # Bestraft direkte Wort- und Phrasenwiederholungen
-PARAMETER repeat_last_n 64       # Wie weit die KI zurückschaut, um Wiederholungen zu strafen
-
-
-# 5. HARDWARE, MODEL-LADEN & SPEICHER (Gruppe 3 & 4)
-PARAMETER num_ctx 8192           # Setzt die Größe des Kontextfensters (Arbeitsspeicher-Hebel)
-PARAMETER num_gpu -1             # Schiebt Schichten auf die GPU (-1 = dynamische Hardware-Erkennung, 0 = Reine CPU, 1+ = GPU-Schichten)
-PARAMETER num_thread 8           # CPU-Kerne für Berechnungen (falls auf CPU ausgelagert wird)
-PARAMETER seed 42                # Fixiert den Zufallswert für absolut identische Antworten beim Testen
-
-
-# 6. STOPP-SEQUENZEN (Erzwingt das Ende der Generierung)
-# Verhindert, dass das Modell über das Ziel hinausschreibt oder Selbstgespräche führt
-PARAMETER stop "<|im_start|>"
-PARAMETER stop "<|im_end|>"
-PARAMETER stop "\n\n\n"
-
-
-# 7. FEW-SHOT EXPERTEN-BEISPIELE (Optional)
-# Gibt dem Modell ein festes Beispiel-Verhalten direkt mit auf den Weg
+# --- Beispiel-Interaktion (Few-Shot) ---
 MESSAGE user "Wie lautet die Hauptstadt von Frankreich?"
 MESSAGE assistant "Die Hauptstadt von Frankreich ist Paris."

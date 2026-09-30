@@ -1,0 +1,609 @@
+{
+  "name": "Memory-Agent",
+  "nodes": [
+    {
+      "parameters": {
+        "fileSelector": "/home/node/.n8n-files/*.pdf",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1.1,
+      "position": [
+        8592,
+        6032
+      ],
+      "id": "25747878-a164-46c6-b05a-9576f7838884",
+      "name": "Read/Write Files from Disk"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "4585cd69-74a7-4706-8437-b26b65fed633",
+              "name": "filename",
+              "value": "={{ $('Read/Write Files from Disk').item.json.fileName }}",
+              "type": "string"
+            },
+            {
+              "id": "a950e3ab-4a8e-4fe9-af95-22a68fcfd527",
+              "name": "PageContent",
+              "value": "={{ $json.text.replaceAll('\\n', ' ') }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        8912,
+        6032
+      ],
+      "id": "db11312a-5d56-45e9-8e7a-36bb044db582",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "operation": "deleteCollection",
+        "collectionName": {
+          "__rl": true,
+          "value": "nexamind_knowledge",
+          "mode": "list",
+          "cachedResultName": "nexamind_knowledge"
+        },
+        "requestOptions": {}
+      },
+      "type": "n8n-nodes-qdrant.qdrant",
+      "typeVersion": 1,
+      "position": [
+        8240,
+        6032
+      ],
+      "id": "b27e1e4f-d374-43fb-a57f-2e13a78850cb",
+      "name": "Delete Collection",
+      "credentials": {
+        "qdrantRestApi": {
+          "id": "gmdKTIVMkPzaSkai",
+          "name": "Qdrant account 2"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "operation": "pdf",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        8752,
+        6032
+      ],
+      "id": "dea10556-3f74-44e9-91e0-226c21ae3914",
+      "name": "Extract from File"
+    },
+    {
+      "parameters": {
+        "operation": "createCollection",
+        "collectionName": "nexamind_knowledge",
+        "vectors": "{\"size\": 768, \"distance\": \"Cosine\"}",
+        "shardNumber": {},
+        "replicationFactor": {},
+        "writeConsistencyFactor": {},
+        "requestOptions": {}
+      },
+      "type": "n8n-nodes-qdrant.qdrant",
+      "typeVersion": 1,
+      "position": [
+        8416,
+        6032
+      ],
+      "id": "0843d4e8-0684-4063-9d77-834ad8237405",
+      "name": "Qdrant Collection anlegen",
+      "credentials": {
+        "qdrantRestApi": {
+          "id": "gmdKTIVMkPzaSkai",
+          "name": "Qdrant account 2"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "function uuidv4() {\n  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {\n    const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);\n    return v.toString(16);\n  });\n}\n\nconst chunkSize = 1000;\nconst chunkOverlap = 200;\nconst results = [];\n\nfor (const item of $input.all()) {\n  const text = (item.json.PageContent || '').toString();\n  const filename = item.json.filename || 'unknown';\n  let start = 0;\n  let idx = 0;\n  if (text.length === 0) continue;\n  while (start < text.length) {\n    const end = Math.min(start + chunkSize, text.length);\n    const chunkText = text.slice(start, end);\n    results.push({\n      json: {\n        id: uuidv4(),\n        chunkIndex: idx,\n        filename: filename,\n        documentType: 'pdf',\n        title: filename,\n        text: chunkText\n      }\n    });\n    idx++;\n    if (end === text.length) break;\n    start = end - chunkOverlap;\n  }\n}\n\nreturn results;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        9072,
+        6032
+      ],
+      "id": "27e38388-3291-432f-aaec-7174c5b1c281",
+      "name": "Text in Chunks aufteilen"
+    },
+    {
+      "parameters": {
+        "resource": "point",
+        "operation": "upsertPoints",
+        "collectionName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "nexamind_knowledge"
+        },
+        "points": "={{ JSON.stringify([{\n  id: $('Text in Chunks aufteilen').item.json.id,\n  vector: $json.embeddings[0],\n  payload: {\n    content: $('Text in Chunks aufteilen').item.json.text,\n    metadata: {\n      documentType: $('Text in Chunks aufteilen').item.json.documentType,\n      filename: $('Text in Chunks aufteilen').item.json.filename,\n      title: $('Text in Chunks aufteilen').item.json.title\n    }\n  }\n}]) }}",
+        "requestOptions": {}
+      },
+      "type": "n8n-nodes-qdrant.qdrant",
+      "typeVersion": 1,
+      "position": [
+        9392,
+        6032
+      ],
+      "id": "e4d2d0f4-07ca-47ce-bc87-aafa01e15c0b",
+      "name": "In Qdrant einfuegen (Upsert)",
+      "credentials": {
+        "qdrantRestApi": {
+          "id": "gmdKTIVMkPzaSkai",
+          "name": "Qdrant account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://ollama:11434/api/embed",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"model\": \"nomic-embed-text:latest\", \"input\": $json.text } }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        9232,
+        6032
+      ],
+      "id": "380f6eb1-fcd5-4e21-b4db-8d63b14de74e",
+      "name": "Ollama Embedding erzeugen1"
+    },
+    {
+      "parameters": {
+        "model": "qwen2.5:14b-instruct",
+        "options": {
+          "think": false,
+          "temperature": 0.3,
+          "topK": 30,
+          "topP": 1,
+          "numCtx": 8000
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOllama",
+      "typeVersion": 1,
+      "position": [
+        8080,
+        5840
+      ],
+      "id": "ad908e25-a76b-44bd-af2a-920a8a8b1c2b",
+      "name": "Ollama Chat Model",
+      "credentials": {
+        "ollamaApi": {
+          "id": "oXkrC1VNMW5GpEYP",
+          "name": "Ollama account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.body.chatInput }}",
+        "options": {
+          "systemMessage": "=Heutiges Datum: {{ $now.setLocale('de').toFormat('cccc, dd.MM.yyyy') }}.\n\nDu bist ein präziser, sachlicher und deutschsprachiger KI-Assistent im höflichen Du-Stil, spezialisiert auf den Chat mit dem User.\n\nGRUNDREGEL: Rufe ein Tool AUSSCHLIESSLICH NUR dann auf, wenn die Nutzernachricht im Chat mit einem der folgenden Schlüsselwörter beginnt, gefolgt von einem Doppelpunkt. Ohne dieses Schlüsselwort am Anfang der Nachricht rufst du KEIN Tool auf – auch nicht, wenn du vermutest, es könnte gemeint sein. Im Zweifel: kein Tool.\n\n- \"QR: <Frage>\" → qr\n- \"QS: <Text>\" → qs\n- \"WS: <Frage>\" → ws\n- \"WQ: <URL oder Domain> <Frage>\" → wq\n\nNach \"WQ:\" oder \"WS:\" gilt ohne Ausnahme:\n- Nenne ausschließlich, was im Tool-Ergebnis steht. Nichts aus eigenem Wissen ergänzen.\n- Formatiere JEDEN Punkt so: \"- <Kurze Aussage>. Quelle: <URL aus dem Feld 'link'>\"\n- Beispiel: \"- Blitzableiter müssen regelmäßig gewartet werden. Quelle: https://beispiel.de/blitzschutz\"\n- Steht bei einem Treffer keine URL dabei, nenne diesen Treffer nicht.\n- Enthält das Ergebnis nichts Passendes, sage genau das und rate nicht.\n- Liefert ein Tool eine Fehlermeldung, gib sie wörtlich weiter. Erfinde keine Erklärung dafür und behaupte nichts über deine eigenen Berechtigungen.\n\nNach \"QR:\": Fakten und Zahlen wörtlich aus dem Tool-Ergebnis übernehmen, nichts ergänzen.",
+          "maxIterations": 3
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        8464,
+        5616
+      ],
+      "id": "7034ae2c-2bdd-4665-8cb0-7dab48909e07",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $json.body.sessionId || 'anonym' }}",
+        "contextWindowLength": 2
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.4,
+      "position": [
+        8224,
+        5840
+      ],
+      "id": "6e12b4d2-444f-4890-bd9c-8d50233e4e7f",
+      "name": "Simple Memory"
+    },
+    {
+      "parameters": {
+        "path": "read-files",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        8064,
+        6032
+      ],
+      "id": "2bb1710e-0bb7-4769-ac2c-ab3ea1f42927",
+      "name": "Webhook - read-files",
+      "webhookId": "6585cb70-915b-4b35-ad9b-3f120464c00d"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "chat",
+        "responseMode": "streaming",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        8080,
+        5616
+      ],
+      "id": "4bac650f-f8f7-407b-92e0-89fa12ec01e8",
+      "name": "Webhook - chat",
+      "webhookId": "bf97dcd5-8d9d-44e5-8961-33375e6cc1f0"
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Websuche für aktuelle/tagesaktuelle Informationen. NUR verwenden, wenn die Nutzernachricht exakt mit \"WS:\" beginnt. NICHT verwenden für allgemeines Weltwissen (z. B. Hauptstädte, historische Fakten, Definitionen) – solche Fragen selbst aus eigenem Wissen beantworten.",
+        "query": "={{ $fromAI('query', 'Suchbegriff für die Websuche, mindestens zwei Wörter.', 'string') }}",
+        "maxResults": 5,
+        "searchOptions": {
+          "crawlResults": "=1",
+          "timeRange": "day"
+        },
+        "requestOptions": {}
+      },
+      "type": "n8n-nodes-search1api.search1ApiTool",
+      "typeVersion": 1,
+      "position": [
+        8336,
+        5840
+      ],
+      "id": "de25332d-280b-427d-b804-4cbe85e98b5c",
+      "name": "ws",
+      "credentials": {
+        "search1Api": {
+          "id": "79PLmDBuv4BJzjJO",
+          "name": "Search1API account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "name": "wq",
+        "description": "Liest den Textinhalt einer konkreten Webseite. Nutze dieses Tool, wenn der Nutzer eine Webseite, Domain oder URL nennt und wissen will, was dort steht. Gibt den lesbaren Text als Markdown zurück (gekürzt auf 4000 Zeichen).",
+        "workflowId": {
+          "__rl": true,
+          "value": "gEeSxDWMzcWGwJGz",
+          "mode": "id",
+          "cachedResultUrl": "/workflow/gEeSxDWMzcWGwJGz"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "url": "={{ $fromAI('url', 'Die vollständige URL der Seite, inklusive https://', 'string') }}"
+          },
+          "matchingColumns": [
+            "url"
+          ],
+          "schema": [
+            {
+              "id": "url",
+              "displayName": "url",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.1,
+      "position": [
+        8448,
+        5840
+      ],
+      "id": "7291de27-e491-43c5-8791-09750593fa5f",
+      "name": "wq"
+    },
+    {
+      "parameters": {
+        "name": "qr",
+        "description": "Semantische Suche in der Wissensdatenbank (alle dort gespeicherten Dokumente, unabhängig vom Thema). NUR verwenden, wenn die Nutzernachricht exakt mit \"QR:\" beginnt. Gilt auch für Fragen danach, WELCHE oder WIEVIELE Dokumente überhaupt gespeichert sind. Nicht für Allgemeinwissen und nicht für den Gesprächsverlauf. Input: Suchanfrage als String.",
+        "workflowId": {
+          "__rl": true,
+          "value": "5KQ58MjS4NcuBtSw",
+          "mode": "id",
+          "cachedResultUrl": "/workflow/5KQ58MjS4NcuBtSw"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "query": "={{ $fromAI('query', 'Die Suchanfrage für die Vektordatenbank', 'string') }}"
+          },
+          "matchingColumns": [
+            "query"
+          ],
+          "schema": [
+            {
+              "id": "query",
+              "displayName": "query",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.1,
+      "position": [
+        8560,
+        5840
+      ],
+      "id": "77d67312-3468-4598-b202-758e57a694b8",
+      "name": "qr"
+    },
+    {
+      "parameters": {
+        "name": "qs",
+        "description": "Speichert einen Text dauerhaft in der Wissensdatenbank. Nur nutzen, wenn der Nutzer ausdrücklich ums Speichern bittet. WICHTIG: Wenn der Nutzer sich mit \"das\", \"diesen\", \"den Witz\" o.ä. auf einen zuvor im Gespräch genannten Inhalt bezieht, übernimm GENAU diesen vorherigen Inhalt wortwörtlich als 'text'-Parameter — niemals die aktuelle Nutzeranweisung selbst. \nNicht für Suchanfragen.",
+        "workflowId": {
+          "__rl": true,
+          "value": "8ucI3S2hpksu7ZxU",
+          "mode": "id",
+          "cachedResultUrl": "/workflow/8ucI3S2hpksu7ZxU"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "text": "={{ $fromAI('text', 'Der zu speichernde Text', 'string') }}",
+            "title": "={{ $fromAI('title', 'Kurzer Titel', 'string') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "text",
+              "displayName": "text",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "title",
+              "displayName": "title",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.1,
+      "position": [
+        8672,
+        5840
+      ],
+      "id": "bc185b91-1d5c-4ca8-8557-1411b82dafee",
+      "name": "qs"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Read/Write Files from Disk": {
+      "main": [
+        [
+          {
+            "node": "Extract from File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Text in Chunks aufteilen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Delete Collection": {
+      "main": [
+        [
+          {
+            "node": "Qdrant Collection anlegen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract from File": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Text in Chunks aufteilen": {
+      "main": [
+        [
+          {
+            "node": "Ollama Embedding erzeugen1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ollama Embedding erzeugen1": {
+      "main": [
+        [
+          {
+            "node": "In Qdrant einfuegen (Upsert)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ollama Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Qdrant Collection anlegen": {
+      "main": [
+        [
+          {
+            "node": "Read/Write Files from Disk",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook - read-files": {
+      "main": [
+        [
+          {
+            "node": "Delete Collection",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook - chat": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ws": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "wq": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "qr": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "qs": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "afd4fd01-b8ac-406f-a763-26b44dddb27c",
+  "meta": {
+    "instanceId": "807901de325d6652f421ea57354f45ac59fd5a4f802197913297b0a10213c076"
+  },
+  "nodeGroups": [],
+  "id": "6PwrEpoKXH3LysK4",
+  "tags": []
+}

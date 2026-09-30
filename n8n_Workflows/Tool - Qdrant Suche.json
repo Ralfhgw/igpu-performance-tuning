@@ -1,0 +1,139 @@
+{
+  "name": "Tool - Qdrant Suche",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "query"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -96,
+        -336
+      ],
+      "id": "5b04751f-5008-45ce-9330-f50d25c59e61",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://ollama:11434/api/embeddings",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"model\": \"nomic-embed-text:latest\", \"prompt\": $json.query } }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        128,
+        -336
+      ],
+      "id": "12ee61c8-d625-4b61-893d-b9e60f735a63",
+      "name": "Ollama Embedding (Query)"
+    },
+    {
+      "parameters": {
+        "resource": "search",
+        "operation": "queryPoints",
+        "collectionName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "nexamind_knowledge"
+        },
+        "query": "={{ JSON.stringify($json.embedding) }}",
+        "limit": 15,
+        "requestOptions": {}
+      },
+      "type": "n8n-nodes-qdrant.qdrant",
+      "typeVersion": 1,
+      "position": [
+        352,
+        -336
+      ],
+      "id": "c5a26d82-6cce-4d2c-bad6-4db98a234d09",
+      "name": "Qdrant Suche (Query Points)",
+      "credentials": {
+        "qdrantRestApi": {
+          "id": "gmdKTIVMkPzaSkai",
+          "name": "Qdrant account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst points = items[0]?.json?.result?.points ?? [];\n\nif (points.length === 0) {\n  return [{ json: { answer: 'Keine passenden Dokumente in der Wissensdatenbank gefunden.' } }];\n}\n\nconst uniqueFiles = [...new Set(points.map(p => (p.payload?.metadata?.filename) || 'unbekannt'))];\nconst fileList = uniqueFiles.map((f, i) => `${i + 1}. ${f}`).join('\\n');\n\nconst blocks = points.map((point, i) => {\n  const payload = point.payload || {};\n  const meta = payload.metadata || {};\n  const content = payload.content || '';\n  const score = point.score !== undefined ? point.score : '';\n  return `[Treffer ${i + 1}] (Score: ${score}, Datei: ${meta.filename || 'unbekannt'}, Titel: ${meta.title || ''})\\n${content}`;\n}).join('\\n\\n---\\n\\n');\n\nconst answer = `In der Wissensdatenbank abgespeicherte Dokumente (dedupliziert):\\n${fileList}\\n\\n---\\n\\nGefundene Textausschnitte:\\n\\n${blocks}`;\n\nreturn [{ json: { answer } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        576,
+        -336
+      ],
+      "id": "720ca88f-a08a-4bb0-9c05-8b87e9ee5ff5",
+      "name": "Ergebnisse formatieren"
+    }
+  ],
+  "pinData": {
+    "When Executed by Another Workflow": [
+      {
+        "json": {
+          "query": null
+        }
+      }
+    ]
+  },
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Ollama Embedding (Query)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ollama Embedding (Query)": {
+      "main": [
+        [
+          {
+            "node": "Qdrant Suche (Query Points)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Qdrant Suche (Query Points)": {
+      "main": [
+        [
+          {
+            "node": "Ergebnisse formatieren",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "2fb76619-d4a3-4a20-b5a6-02fe52370138",
+  "meta": {
+    "instanceId": "807901de325d6652f421ea57354f45ac59fd5a4f802197913297b0a10213c076"
+  },
+  "nodeGroups": [],
+  "id": "5KQ58MjS4NcuBtSw",
+  "tags": []
+}

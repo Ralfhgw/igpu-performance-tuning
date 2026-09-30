@@ -1,0 +1,96 @@
+{
+  "name": "Tool - Seite lesen",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "url"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -480,
+        -272
+      ],
+      "id": "574ea4f0-a2c6-466a-b9d9-0878396d84d4",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "url": "=https://r.jina.ai/{{ $json.url }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "text",
+              "outputPropertyName": "text"
+            }
+          },
+          "timeout": 20000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -256,
+        -272
+      ],
+      "id": "ab03300b-ae99-4e20-8556-7d06fa746672",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $json.text || '';\nconst truncated = raw.substring(0, 4000);\nreturn [{ json: { text: truncated } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -32,
+        -272
+      ],
+      "id": "9c297a69-e513-413e-92db-7f011561f130",
+      "name": "Text kürzen"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Text kürzen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "bbcebb4e-4022-41c1-b1dd-c5936ba90da1",
+  "meta": {
+    "instanceId": "807901de325d6652f421ea57354f45ac59fd5a4f802197913297b0a10213c076"
+  },
+  "nodeGroups": [],
+  "id": "gEeSxDWMzcWGwJGz",
+  "tags": []
+}

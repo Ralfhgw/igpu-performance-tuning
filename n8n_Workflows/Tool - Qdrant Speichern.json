@@ -1,0 +1,157 @@
+{
+  "name": "Tool - Qdrant Speichern",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "text"
+            },
+            {
+              "name": "title"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -1104,
+        -672
+      ],
+      "id": "740c99a0-00f6-4afe-8e6b-b196673ad956",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "jsCode": "function uuidv4() {\n  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {\n    const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);\n    return v.toString(16);\n  });\n}\nconst item = $input.first().json;\nreturn [{ json: { id: uuidv4(), text: item.text, title: item.title || 'Chat-Notiz' } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -880,
+        -672
+      ],
+      "id": "6e2bb1ae-00d6-4ecb-bc5a-b0d0ea931b16",
+      "name": "ID erzeugen"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://ollama:11434/api/embeddings",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"model\": \"nomic-embed-text:latest\", \"prompt\": $json.text } }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -656,
+        -672
+      ],
+      "id": "47df0701-e32d-428b-8adb-e24f37e5edbf",
+      "name": "Ollama Embedding erzeugen"
+    },
+    {
+      "parameters": {
+        "resource": "point",
+        "operation": "upsertPoints",
+        "collectionName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "nexamind_knowledge"
+        },
+        "points": "={{ JSON.stringify([{\n  id: $('ID erzeugen').item.json.id,\n  vector: $json.embedding,\n  payload: {\n    content: $('ID erzeugen').item.json.text,\n    metadata: {\n      documentType: 'chat-notiz',\n      filename: 'chat',\n      title: $('ID erzeugen').item.json.title\n    }\n  }\n}]) }}",
+        "requestOptions": {}
+      },
+      "type": "n8n-nodes-qdrant.qdrant",
+      "typeVersion": 1,
+      "position": [
+        -432,
+        -672
+      ],
+      "id": "e816145e-a078-4312-9314-dd0f155faab9",
+      "name": "In Qdrant einfuegen",
+      "credentials": {
+        "qdrantRestApi": {
+          "id": "gmdKTIVMkPzaSkai",
+          "name": "Qdrant account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: { answer: 'Gespeichert: \"' + $('ID erzeugen').item.json.text + '\"' } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -208,
+        -672
+      ],
+      "id": "10a68af8-cfdd-43e4-b91b-c077f9b9e711",
+      "name": "Bestaetigung"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "ID erzeugen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ID erzeugen": {
+      "main": [
+        [
+          {
+            "node": "Ollama Embedding erzeugen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ollama Embedding erzeugen": {
+      "main": [
+        [
+          {
+            "node": "In Qdrant einfuegen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "In Qdrant einfuegen": {
+      "main": [
+        [
+          {
+            "node": "Bestaetigung",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "fabf87be-8d44-44c1-8e86-1fb9554838a3",
+  "meta": {
+    "instanceId": "807901de325d6652f421ea57354f45ac59fd5a4f802197913297b0a10213c076"
+  },
+  "nodeGroups": [],
+  "id": "8ucI3S2hpksu7ZxU",
+  "tags": []
+}
