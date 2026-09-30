@@ -1,5 +1,5 @@
 import requests
-# Aktivierung der virtuellen Umgebung für Python
+# Aktivierung  der virtuellen Umgebung für Python
 # python3 -m venv .venv
 # source .venv/bin/activate
 # pip install requests
